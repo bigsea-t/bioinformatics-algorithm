@@ -8,26 +8,36 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <queue>
 
 using namespace std;
 
 class TNode {
 public:
-    char c;
-    vector<TNode> cnodes;
-    bool isEnd;
-
-
-    TNode(char _c) : c(_c), cnodes(), isEnd(false) {};
+    TNode(char _c) : c(_c), cnodes(), isEnd(false) ,depth(0) {};
+    TNode(char _c, int _d) : c(_c), cnodes(), isEnd(false) ,depth(_d) {};
     void addWord(const string & s);
     vector<string> get_all_string();
+    void make_fail_func();
+    vector<pair<int, int> > exact_match(const string & text);
+
 private:
-    vector<TNode>::iterator find_child(char c);
+    char c;
+    vector<TNode> cnodes; // it would be better to hold pointers to TNode
+    int depth; // zero at root
+    bool isEnd;
+    TNode * fail;
+
+    TNode * find_child(char c);
 };
 
-vector<TNode>::iterator TNode::find_child(char c){
+TNode * TNode::find_child(char c){
     auto cmp = [c](const TNode & n){return c == n.c;};
-    return find_if(cnodes.begin(), cnodes.end(), cmp);
+    auto itr = find_if(cnodes.begin(), cnodes.end(), cmp);
+    if (itr == cnodes.end())
+        return NULL;
+    else
+        return &*itr;
 }
 
 void TNode::addWord(const string & s){
@@ -38,9 +48,9 @@ void TNode::addWord(const string & s){
 
     auto cnode = find_child(s[0]);
 
-    if (cnode == cnodes.end()){
-        cnodes.emplace_back(s[0]);
-        cnode = cnodes.end() - 1 ;
+    if (cnode == NULL){
+        cnodes.emplace_back(s[0], this->depth+1);
+        cnode = &(cnodes[cnodes.size() - 1]);
     }
 
     cnode->addWord(s.substr(1, s.size()-1));
@@ -70,6 +80,71 @@ vector<string> TNode::get_all_string(){
     return vs;
 }
 
+void TNode::make_fail_func(){
+    TNode * root = this;
+
+    root->fail = root;
+
+    queue<TNode *> q;
+    for (auto &u : root->cnodes){
+        u.fail = root;
+        q.push(&u);
+    }
+
+    while(! q.empty()){
+        TNode * v = q.front(); q.pop();
+
+        for (auto & u: v->cnodes){
+            q.push(&u);
+
+            TNode *s = v->fail;
+            TNode *g;
+
+            while(true){
+                g = s->find_child(u.c);
+
+                if(g != NULL || s == root)
+                    break;
+
+                s = s->fail;
+            }
+
+            if (g == NULL)
+                u.fail = root;
+            else
+                u.fail = g;
+        }
+    }
+}
+
+vector<pair<int, int> > TNode::exact_match(const string & text)
+{
+    vector<pair<int, int> > ranges;
+    TNode * pa = this, * root = this;
+
+    for (int i = 0; i < text.size(); i++) {
+        while(true){
+            TNode * ch = pa->find_child(text[i]);
+
+            if (ch == NULL){
+                pa = pa->fail;
+                if (pa == root)
+                    break;
+            } else {
+                pa = ch;
+                break;
+            }
+        }
+        TNode * n = pa;
+        while(n != root){
+            if (n->isEnd) {
+                ranges.emplace_back(i-n->depth+1, i+1);
+            }
+            n = n->fail;
+        }
+    }
+    return ranges;
+}
 
 int main()
 {
@@ -84,26 +159,21 @@ int main()
         cin >> keys[i];
     }
 
-    cout << text << endl;
-
-    for (auto & s: keys) {
-        cout << s << endl;
-    }
-
     TNode root('\0');
 
     for (auto & s: keys){
         root.addWord(s);
     }
 
-    cout << "== trie ==" << endl;
+    root.make_fail_func();
 
-    vector<string> trie_keys = root.get_all_string();
+    auto ranges = root.exact_match(text);
 
-    for (auto & s: trie_keys){
-        cout << s << endl;
+    sort(ranges.begin(), ranges.end());
+
+    for (auto r: ranges){
+        cout << r.first << " " << r.second << endl;
     }
-
 
     return 0;
 }
