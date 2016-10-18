@@ -1,12 +1,14 @@
-input_files=(`ls *.in`)
+name=$1
+
+input_files=(`ls ${name}/*.in`)
 n_files=${#input_files[@]}
 
 n_failed=0
 
-g++ -std=c++11 kmp.cpp -o kmp
+g++ -std=c++11 ${name}/${name}.cpp -o ${name}/${name}.o
 
 for i in `seq 1 $n_files`; do
-	./kmp < $i.in  | diff $i.out -
+	${name}/${name}.o < ${name}/$i.in  | diff ${name}/${i}.out -
 
 	if [ $? -eq 0 ] ; then
 	   echo "test$i passed"
